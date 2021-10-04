@@ -1,0 +1,53 @@
+= Quick Start
+
+== Istio Setup
+
+1) Download istio to a directory of your choice. Detailed steps can be found here.
+
+2) To activate monitoring tools, navigate to <istioctl-installation-directory>/samples. To install Kiali, Prometheus, Jaeger, Zipkin and Grafana:
+-----
+kubectl apply -f ./addons
+-----
+
+3) List all istio services to which tools can be activated:
+-----
+kubectl get svc -n istio-system
+-----
+
+4) Port-forward the service you want to access:
+-----
+kubectl port-forward svc/kiali -n istio-system 20001
+-----
+
+== Demo Installation
+
+1) Start minikube:
+-----
+minikube start
+-----
+
+2) Activate istio in your minikube kubernetes cluster:
+-----
+istioctl install --set profile=demo -y
+-----
+
+3) Install Kafka, Zookeeper, Consumer and Producer:
+-----
+cd ./k8s
+./install.sh
+-----
+
+Kiali should now display mTLS as enabled for the namespace. +
+To test if mTLS works, you can deploy kafka-sample-other-namespace.yaml in another namespace where Istio is not (!) enabled.
+The pod will then not contain sidecars and containers will therefore not be able to communicate using mTLS. If the logs of
+kafka-consumer or kafka-producer are examined, it will be visible that the communication will fail.
+
+If the mTLS mode is set to PERMISSIVE, communication with and without mTLS will be allowed again and producing/consuming will succeed. For more details, refer to the official https://github.com/istio/istio/issues/35336[documentation].
+
+== Envoy Admin Interface in Istio
+The admin interface for Envoy is available at localhost:15000.
+
+== Envoy Contrib Images
+Envoy moved experimental filters to a separate Docker image in release 1.20. For Istio, this means that some filters can only be used when Istio version 1.11 is used. Istio version 1.12 will already include Envoy 1.20 and therefore only officially supported features. On https://github.com/istio/istio/issues/35336[Github], it is already discussed whether Istio should maintain official and contrib images.
+
+

@@ -1,0 +1,118 @@
+version: '2'
+services:
+
+  ###############################################
+  # Envoy Proxy for Kafka Broker
+  ###############################################
+  envoy_broker:
+    container_name: envoy_broker
+    hostname: envoy_broker
+    image: envoyproxy/envoy-contrib-dev:latest  # Kafka protocol support is only included in contrib images!
+    ports:
+      - "10000:10000"
+      - "19092:19092"
+      - "9902:9901"
+    volumes:
+      - ./envoy.broker.yaml:/etc/envoy/envoy.yaml
+      - ./certs/kafka-broker.ca.cert.pem:/certs/kafka-broker.ca.cert.pem
+      - ./certs/kafka-broker.server.cert.pem:/certs/kafka-broker.server.cert.pem
+      - ./certs/kafka-broker.server.chain.pem:/certs/kafka-broker.server.chain.pem
+      - ./certs/kafka-broker.server.key.pem:/certs/kafka-broker.server.key.pem
+      - ./certs/kafka-broker.server.key.credentials:/certs/kafka-broker.server.key.credentials
+    environment:
+      ENVOY_LOG_LEVEL: debug
+    depends_on:
+      - kafka
+    networks:
+      kafka:
+        aliases:
+          - envoy-kafka
+      proxy:
+        aliases:
+          - envoy-kafka
+
+  ###############################################
+  # Envoy Proxy for Kafka Client
+  ###############################################
+  envoy_client:
+    container_name: envoy_client
+    hostname: envoy_client
+    image: envoyproxy/envoy-contrib-dev:latest # Kafka protocol support in only included in contrib images!
+    ports:
+      - "10001:10000"
+      - "19090:19090"
+      - "9901:9901"
+    volumes:
+      - ./envoy.client.yaml:/etc/envoy/envoy.yaml
+      - ./certs/kafka-broker.ca.cert.pem:/certs/kafka-broker.ca.cert.pem
+      - ./certs/kafka-broker.server.cert.pem:/certs/kafka-broker.server.cert.pem
+      - ./certs/kafka-broker.server.key.pem:/certs/kafka-broker.server.key.pem
+      - ./certs/kafka-broker.server.key.credentials:/certs/kafka-broker.server.key.credentials
+    environment:
+      ENVOY_LOG_LEVEL: debug
+    networks:
+      proxy:
+        aliases:
+          - envoy-client
+
+  #############################################################
+  # Apache Zookeeper (CP)                                     #
+  #############################################################
+  zookeeper:
+    image: confluentinc/cp-zookeeper:${VERSION_CONFLUENT}
+    hostname: zookeeper
+    container_name: zookeeper
+    restart: always
+    ports:
+      - 12181:2181
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181 # (required) This is the port where ZooKeeper clients will listen on. This is where the Brokers will connect to ZooKeeper.
+      ZOOKEEPER_TICK_TIME: 2000 # (default: 3000) The unit of time for ZooKeeper translated to milliseconds. This governs all ZooKeeper time dependent operations. It is used for heartbeats and timeouts especially.
+    networks:
+      zookeeper:
+        aliases:
+          - zookeeper
+
+  #############################################################
+  # Confluent Server (CP)                                     #
+  #############################################################
+  kafka:
+    image: confluentinc/cp-server:${VERSION_CONFLUENT}
+    hostname: kafka
+    container_name: kafka
+    restart: always
+    ports:
+      - 9092:9092
+    environment:
+      KAFKA_BROKER_ID: 1 # (default: -1) The broker id for this server. If unset, a unique broker id will be generated.
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181 # (required) Instructs Kafka how to get in touch with ZooKeeper.
+      KAFKA_CUB_ZK_TIMEOUT: 60 # (default: 40) Docker image setting, which specified the amount of time to wait for Zookeeper. Could be used, to get rid of Docker healthchecks.
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: DOCKER:PLAINTEXT,HOST:PLAINTEXT,ENVOY:PLAINTEXT # (default: PLAINTEXT:PLAINTEXT,...) Map between listener names and security protocols. In this scenario this setting is used to define listeners with names.
+      KAFKA_LISTENERS: DOCKER://0.0.0.0:9092, HOST://0.0.0.0:9091, ENVOY://0.0.0.0:9090 # (required) List of URIs we will listen on and the listener names. In this case, Kafka listens in both ports on all interfaces.
+      KAFKA_ADVERTISED_LISTENERS: DOCKER://127.0.0.1:19092, HOST://kafka:9091, ENVOY://envoy:19090 # (required) Describes how the host name that is advertised and can be reached by clients. HOST://localhost:19092 enables access from Docker host.
+      KAFKA_CONTROL_PLAIN_LISTENER_NAME: HOST # (default: PLAINTEXT) Name of listener used for communication between controller and brokers. By default, no dedicated listener is used.
+      KAFKA_INTER_BROKER_LISTENER_NAME: HOST # (default: PLAINTEXT) Name of listener used for communication between brokers.  By default, no dedicated listener is used.
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0 # (default: 3000) The amount of time the group coordinator will wait for more consumers to join a new group before performing the first rebalance. Set to 0 to ensure, that consumers start faster in dev environments.
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false" # (default: true) We disabled auto creation of topics, to ensure that topics are created with the correct configuration. However, if defaults are fine, this could be enabled.
+      KAFKA_NUM_PARTITIONS: 3 # (default: 1) The default number of partitions per topic.
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1 # (default: 3) The replication factor for the offsets topic. Must be 1, because we only have a single broker.
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1 # (default: 3) The replication factor for the transaction topic. Must be 1, because we only have a single broker.
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1 # (default: 2) Overridden min.insync.replicas config for the transaction topic. Must be 1, because we only have a single broker.
+      KAFKA_CONFLUENT_LICENSE_TOPIC_REPLICATION_FACTOR: 1 # (default 3): The replication factor for the license topic. Must be 1, because we only have a single broker.
+    depends_on:
+      - zookeeper
+    networks:
+      kafka:
+        aliases:
+          - kafka
+      zookeeper:
+        aliases:
+          - kafka
+
+networks:
+  kafka:
+    driver: bridge
+  zookeeper:
+    driver: bridge
+  proxy:
+    driver: bridge

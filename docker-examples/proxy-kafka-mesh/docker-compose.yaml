@@ -1,0 +1,189 @@
+version: '2'
+services:
+
+  ###############################################
+  # Envoy Proxy for Kafka Broker
+  ###############################################
+  envoy_broker:
+    container_name: envoy_broker
+    hostname: envoy_broker
+    image: envoyproxy/envoy-contrib-dev:latest  # Kafka protocol support is only included in contrib images!
+    ports:
+      - "10000:10000"
+      - "19090:19090"
+      - "9902:9901"
+    volumes:
+      - ./envoy.broker.yaml:/etc/envoy/envoy.yaml
+    environment:
+      ENVOY_LOG_LEVEL: debug
+    depends_on:
+      - kafka1
+      - kafka2
+      - kafka3
+    networks:
+      kafka:
+        aliases:
+          - envoy-kafka
+
+  #############################################################
+  # Apache Zookeeper (CP)                                     #
+  #############################################################
+  zookeeper1:
+    image: confluentinc/cp-zookeeper:${VERSION_CONFLUENT}
+    hostname: zookeeper1
+    container_name: zookeeper1
+    restart: always
+    ports:
+      - 12181:2181
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181 # (required) This is the port where ZooKeeper clients will listen on. This is where the Brokers will connect to ZooKeeper.
+      ZOOKEEPER_TICK_TIME: 2000 # (default: 3000) The unit of time for ZooKeeper translated to milliseconds. This governs all ZooKeeper time dependent operations. It is used for heartbeats and timeouts especially.
+    networks:
+      zookeeper1:
+        aliases:
+          - zookeeper
+
+  zookeeper2:
+    image: confluentinc/cp-zookeeper:${VERSION_CONFLUENT}
+    hostname: zookeeper2
+    container_name: zookeeper2
+    restart: always
+    ports:
+      - 12182:2182
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2182 # (required) This is the port where ZooKeeper clients will listen on. This is where the Brokers will connect to ZooKeeper.
+      ZOOKEEPER_TICK_TIME: 2000 # (default: 3000) The unit of time for ZooKeeper translated to milliseconds. This governs all ZooKeeper time dependent operations. It is used for heartbeats and timeouts especially.
+    networks:
+      zookeeper2:
+        aliases:
+          - zookeeper
+
+  zookeeper3:
+    image: confluentinc/cp-zookeeper:${VERSION_CONFLUENT}
+    hostname: zookeeper3
+    container_name: zookeeper3
+    restart: always
+    ports:
+      - 12183:2183
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2183 # (required) This is the port where ZooKeeper clients will listen on. This is where the Brokers will connect to ZooKeeper.
+      ZOOKEEPER_TICK_TIME: 2000 # (default: 3000) The unit of time for ZooKeeper translated to milliseconds. This governs all ZooKeeper time dependent operations. It is used for heartbeats and timeouts especially.
+    networks:
+      zookeeper3:
+        aliases:
+          - zookeeper
+
+  #############################################################
+  # Confluent Server (CP)                                     #
+  #############################################################
+  kafka1:
+    image: confluentinc/cp-server:${VERSION_CONFLUENT}
+    hostname: kafka1
+    container_name: kafka1
+    restart: always
+    ports:
+      - 19092:19092
+      - 19091:19091
+    environment:
+      KAFKA_BROKER_ID: 1 # (default: -1) The broker id for this server. If unset, a unique broker id will be generated.
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181 # (required) Instructs Kafka how to get in touch with ZooKeeper.
+      KAFKA_CUB_ZK_TIMEOUT: 60 # (default: 40) Docker image setting, which specified the amount of time to wait for Zookeeper. Could be used, to get rid of Docker healthchecks.
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: DOCKER:PLAINTEXT,HOST:PLAINTEXT # (default: PLAINTEXT:PLAINTEXT,...) Map between listener names and security protocols. In this scenario this setting is used to define listeners with names.
+      KAFKA_LISTENERS: DOCKER://0.0.0.0:19092, HOST://0.0.0.0:19091 # (required) List of URIs we will listen on and the listener names. In this case, Kafka listens in both ports on all interfaces.
+      KAFKA_ADVERTISED_LISTENERS: DOCKER://kafka1:19092, HOST://127.0.0.1:19091 # (required) Describes how the host name that is advertised and can be reached by clients. HOST://localhost:19092 enables access from Docker host.
+      KAFKA_CONTROL_PLAIN_LISTENER_NAME: HOST # (default: PLAINTEXT) Name of listener used for communication between controller and brokers. By default, no dedicated listener is used.
+      KAFKA_INTER_BROKER_LISTENER_NAME: HOST # (default: PLAINTEXT) Name of listener used for communication between brokers.  By default, no dedicated listener is used.
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0 # (default: 3000) The amount of time the group coordinator will wait for more consumers to join a new group before performing the first rebalance. Set to 0 to ensure, that consumers start faster in dev environments.
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true" # (default: true) We disabled auto creation of topics, to ensure that topics are created with the correct configuration. However, if defaults are fine, this could be enabled.
+      KAFKA_NUM_PARTITIONS: 3 # (default: 1) The default number of partitions per topic.
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1 # (default: 3) The replication factor for the offsets topic. Must be 1, because we only have a single broker.
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1 # (default: 3) The replication factor for the transaction topic. Must be 1, because we only have a single broker.
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1 # (default: 2) Overridden min.insync.replicas config for the transaction topic. Must be 1, because we only have a single broker.
+      KAFKA_CONFLUENT_LICENSE_TOPIC_REPLICATION_FACTOR: 1 # (default 3): The replication factor for the license topic. Must be 1, because we only have a single broker.
+    depends_on:
+      - zookeeper1
+    networks:
+      kafka:
+        aliases:
+          - kafka1
+      zookeeper1:
+        aliases:
+          - kafka
+
+  kafka2:
+    image: confluentinc/cp-server:${VERSION_CONFLUENT}
+    hostname: kafka2
+    container_name: kafka2
+    restart: always
+    ports:
+      - 29092:29092
+      - 29091:29091
+    environment:
+      KAFKA_BROKER_ID: 1 # (default: -1) The broker id for this server. If unset, a unique broker id will be generated.
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2182 # (required) Instructs Kafka how to get in touch with ZooKeeper.
+      KAFKA_CUB_ZK_TIMEOUT: 60 # (default: 40) Docker image setting, which specified the amount of time to wait for Zookeeper. Could be used, to get rid of Docker healthchecks.
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: DOCKER:PLAINTEXT,HOST:PLAINTEXT # (default: PLAINTEXT:PLAINTEXT,...) Map between listener names and security protocols. In this scenario this setting is used to define listeners with names.
+      KAFKA_LISTENERS: DOCKER://0.0.0.0:29092, HOST://0.0.0.0:29091 # (required) List of URIs we will listen on and the listener names. In this case, Kafka listens in both ports on all interfaces.
+      KAFKA_ADVERTISED_LISTENERS: DOCKER://kafka2:29092, HOST://127.0.0.1:29091 # (required) Describes how the host name that is advertised and can be reached by clients. HOST://localhost:19092 enables access from Docker host.
+      KAFKA_CONTROL_PLAIN_LISTENER_NAME: HOST # (default: PLAINTEXT) Name of listener used for communication between controller and brokers. By default, no dedicated listener is used.
+      KAFKA_INTER_BROKER_LISTENER_NAME: HOST # (default: PLAINTEXT) Name of listener used for communication between brokers.  By default, no dedicated listener is used.
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0 # (default: 3000) The amount of time the group coordinator will wait for more consumers to join a new group before performing the first rebalance. Set to 0 to ensure, that consumers start faster in dev environments.
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true" # (default: true) We disabled auto creation of topics, to ensure that topics are created with the correct configuration. However, if defaults are fine, this could be enabled.
+      KAFKA_NUM_PARTITIONS: 3 # (default: 1) The default number of partitions per topic.
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1 # (default: 3) The replication factor for the offsets topic. Must be 1, because we only have a single broker.
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1 # (default: 3) The replication factor for the transaction topic. Must be 1, because we only have a single broker.
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1 # (default: 2) Overridden min.insync.replicas config for the transaction topic. Must be 1, because we only have a single broker.
+      KAFKA_CONFLUENT_LICENSE_TOPIC_REPLICATION_FACTOR: 1 # (default 3): The replication factor for the license topic. Must be 1, because we only have a single broker.
+    depends_on:
+      - zookeeper2
+    networks:
+      kafka:
+        aliases:
+          - kafka2
+      zookeeper2:
+        aliases:
+          - kafka
+
+  kafka3:
+    image: confluentinc/cp-server:${VERSION_CONFLUENT}
+    hostname: kafka3
+    container_name: kafka3
+    restart: always
+    ports:
+      - 39092:39092
+      - 39091:39091
+    environment:
+      KAFKA_BROKER_ID: 1 # (default: -1) The broker id for this server. If unset, a unique broker id will be generated.
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2183 # (required) Instructs Kafka how to get in touch with ZooKeeper.
+      KAFKA_CUB_ZK_TIMEOUT: 60 # (default: 40) Docker image setting, which specified the amount of time to wait for Zookeeper. Could be used, to get rid of Docker healthchecks.
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: DOCKER:PLAINTEXT,HOST:PLAINTEXT # (default: PLAINTEXT:PLAINTEXT,...) Map between listener names and security protocols. In this scenario this setting is used to define listeners with names.
+      KAFKA_LISTENERS: DOCKER://0.0.0.0:39092, HOST://0.0.0.0:39091 # (required) List of URIs we will listen on and the listener names. In this case, Kafka listens in both ports on all interfaces.
+      KAFKA_ADVERTISED_LISTENERS: DOCKER://kafka3:39092, HOST://127.0.0.1:39091 # (required) Describes how the host name that is advertised and can be reached by clients. HOST://localhost:19092 enables access from Docker host.
+      KAFKA_CONTROL_PLAIN_LISTENER_NAME: HOST # (default: PLAINTEXT) Name of listener used for communication between controller and brokers. By default, no dedicated listener is used.
+      KAFKA_INTER_BROKER_LISTENER_NAME: HOST # (default: PLAINTEXT) Name of listener used for communication between brokers.  By default, no dedicated listener is used.
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0 # (default: 3000) The amount of time the group coordinator will wait for more consumers to join a new group before performing the first rebalance. Set to 0 to ensure, that consumers start faster in dev environments.
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true" # (default: true) We disabled auto creation of topics, to ensure that topics are created with the correct configuration. However, if defaults are fine, this could be enabled.
+      KAFKA_NUM_PARTITIONS: 3 # (default: 1) The default number of partitions per topic.
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1 # (default: 3) The replication factor for the offsets topic. Must be 1, because we only have a single broker.
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1 # (default: 3) The replication factor for the transaction topic. Must be 1, because we only have a single broker.
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1 # (default: 2) Overridden min.insync.replicas config for the transaction topic. Must be 1, because we only have a single broker.
+      KAFKA_CONFLUENT_LICENSE_TOPIC_REPLICATION_FACTOR: 1 # (default 3): The replication factor for the license topic. Must be 1, because we only have a single broker.
+    depends_on:
+      - zookeeper3
+    networks:
+      kafka:
+        aliases:
+          - kafka3
+      zookeeper3:
+        aliases:
+          - kafka
+
+networks:
+  kafka:
+    driver: bridge
+  zookeeper1:
+    driver: bridge
+  zookeeper2:
+    driver: bridge
+  zookeeper3:
+    driver: bridge

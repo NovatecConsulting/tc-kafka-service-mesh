@@ -1,0 +1,46 @@
+# Reference: Adam Kotwasinski, https://github.com/adamkotwasinski/envoy-kafka-mesh-test/blob/main/envoy-config.yaml
+static_resources:
+
+  listeners:
+    - address:
+        socket_address:
+          address: 0.0.0.0
+          port_value: 19090
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.kafka_broker
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.kafka_broker.v3.KafkaBroker
+                stat_prefix: broker
+            - name: envoy.filters.network.kafka_mesh
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.kafka_mesh.v3alpha.KafkaMesh
+                advertised_host: "0.0.0.0"
+                advertised_port: 19090
+                upstream_clusters:
+                  - cluster_name: kafka1
+                    bootstrap_servers: kafka1:19092
+                    partition_count: 3
+                  - cluster_name: kafka2
+                    bootstrap_servers: kafka2:29092
+                    partition_count: 3
+                  - cluster_name: kafka3
+                    bootstrap_servers: kafka3:39092
+                    partition_count: 3
+                    producer_config:
+                      acks: "1"
+                      linger.ms: "500"
+
+                forwarding_rules:
+                  - target_cluster: kafka1
+                    topic_prefix: a
+                  - target_cluster: kafka2
+                    topic_prefix: b
+                  - target_cluster: kafka3
+                    topic_prefix: c
+
+admin:
+  access_log_path: /dev/null
+  profile_path: /dev/null
+  address:
+    socket_address: { address: 127.0.0.1, port_value: 9901 }
