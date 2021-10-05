@@ -164,10 +164,10 @@ logsDirs: /bitnami/kafka/data
 maxMessageBytes: _1000012
 ## @param defaultReplicationFactor Default replication factors for automatically created topics
 ##
-defaultReplicationFactor: 3
+defaultReplicationFactor: 1
 ## @param offsetsTopicReplicationFactor The replication factor for the offsets topic
 ##
-offsetsTopicReplicationFactor: 3
+offsetsTopicReplicationFactor: 1
 ## @param transactionStateLogReplicationFactor The replication factor for the transaction topic
 ##
 transactionStateLogReplicationFactor: 1
@@ -416,7 +416,7 @@ interBrokerListenerName: INTERNAL
 
 ## @param replicaCount Number of Kafka nodes
 ##
-replicaCount: 3
+replicaCount: 1
 ## @param minBrokerId Minimal broker.id value, nodes increment their `broker.id` respectively
 ## Brokers increment their ID starting at this minimal value.
 ## E.g., with `minBrokerId=100` and 3 nodes, IDs will be 100, 101, 102 for brokers 0, 1, and 2, respectively.
